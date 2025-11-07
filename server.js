@@ -1,7 +1,8 @@
 const express = require('express');
 const cors = require('cors');
-const ytdl = require('ytdl-core');
+const { exec } = require('child_process');
 const path = require('path');
+const fs = require('fs');
 require('dotenv').config();
 
 const app = express();
@@ -11,7 +12,6 @@ app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
-// Port
 const PORT = process.env.PORT || 3000;
 
 // ==================== DOWNLOAD ROUTES ====================
@@ -25,14 +25,24 @@ app.post('/api/metadata', async (req, res) => {
       return res.status(400).json({ error: 'URL required' });
     }
 
-    const info = await ytdl.getInfo(url);
-    
-    res.json({
-      title: info.videoDetails.title,
-      duration: info.videoDetails.lengthSeconds,
-      thumbnail: info.videoDetails.thumbnails[0]?.url,
-      channelName: info.videoDetails.author?.name,
-      views: info.videoDetails.viewCount
+    exec(`yt-dlp -j ${url}`, (error, stdout, stderr) => {
+      if (error) {
+        return res.status(500).json({ error: 'Failed to fetch metadata' });
+      }
+
+      try {
+        const info = JSON.parse(stdout);
+        
+        res.json({
+          title: info.title || 'Unknown',
+          duration: info.duration || 0,
+          thumbnail: info.thumbnail || '',
+          channel: info.uploader || 'Unknown',
+          views: info.view_count || 0
+        });
+      } catch (e) {
+        res.status(500).json({ error: 'Failed to parse metadata' });
+      }
     });
   } catch (error) {
     console.error('Metadata error:', error.message);
@@ -49,34 +59,37 @@ app.post('/api/download-proxy', async (req, res) => {
       return res.status(400).json({ error: 'URL required' });
     }
 
-    const info = await ytdl.getInfo(url);
-    const fileName = info.videoDetails.title.replace(/[^\w\s]/g, '');
+    let command;
 
     if (format === 'audio') {
       // MP3 Download
-      res.setHeader('Content-Disposition', `attachment; filename="${fileName}.mp3"`);
+      res.setHeader('Content-Disposition', 'attachment; filename="audio.mp3"');
       res.setHeader('Content-Type', 'audio/mpeg');
       
-      const audioStream = ytdl(url, { quality: 'highestaudio' });
-      audioStream.pipe(res);
-      
-      audioStream.on('error', (error) => {
-        console.error('Audio download error:', error.message);
-        res.status(500).json({ error: 'Download failed' });
-      });
+      command = `yt-dlp -x --audio-format mp3 --audio-quality 128 -o - ${url}`;
     } else {
       // MP4 Download
-      res.setHeader('Content-Disposition', `attachment; filename="${fileName}.mp4"`);
+      res.setHeader('Content-Disposition', 'attachment; filename="video.mp4"');
       res.setHeader('Content-Type', 'video/mp4');
       
-      const videoStream = ytdl(url, { quality: 'highest' });
-      videoStream.pipe(res);
-      
-      videoStream.on('error', (error) => {
-        console.error('Video download error:', error.message);
-        res.status(500).json({ error: 'Download failed' });
-      });
+      command = `yt-dlp -f "best[ext=mp4]" -o - ${url}`;
     }
+
+    const ytdlp = exec(command);
+    
+    ytdlp.stdout.pipe(res);
+    
+    ytdlp.stderr.on('data', (data) => {
+      console.error('yt-dlp error:', data.toString());
+    });
+
+    ytdlp.on('error', (error) => {
+      console.error('Download error:', error.message);
+      if (!res.headersSent) {
+        res.status(500).json({ error: 'Download failed' });
+      }
+    });
+
   } catch (error) {
     console.error('Download proxy error:', error.message);
     res.status(500).json({ error: 'Download failed' });
@@ -92,12 +105,22 @@ app.post('/api/playlist-videos', async (req, res) => {
       return res.status(400).json({ error: 'URL required' });
     }
 
-    const info = await ytdl.getInfo(url);
-    
-    res.json({
-      playlistTitle: info.videoDetails.title,
-      videoCount: 'N/A',
-      thumbnail: info.videoDetails.thumbnails[0]?.url
+    exec(`yt-dlp -j ${url}`, (error, stdout, stderr) => {
+      if (error) {
+        return res.status(500).json({ error: 'Failed to fetch playlist' });
+      }
+
+      try {
+        const info = JSON.parse(stdout);
+        
+        res.json({
+          playlistTitle: info.title || 'Playlist',
+          videoCount: info.n_entries || 0,
+          thumbnail: info.thumbnail || ''
+        });
+      } catch (e) {
+        res.status(500).json({ error: 'Failed to parse playlist' });
+      }
     });
   } catch (error) {
     console.error('Playlist error:', error.message);
@@ -111,6 +134,7 @@ app.get('/api/health', (req, res) => {
   res.json({ 
     status: 'Server running ✅',
     timestamp: new Date().toLocaleString('en-IN'),
+    supportedSites: '1000+ websites (YouTube, Vimeo, Instagram, TikTok, etc)',
     endpoints: {
       metadata: 'POST /api/metadata',
       download: 'POST /api/download-proxy',
@@ -130,8 +154,7 @@ app.use((err, req, res, next) => {
 app.listen(PORT, () => {
   console.log(`\n${'='.repeat(50)}`);
   console.log(`🚀 Backend running on port ${PORT}`);
-  console.log(`${'='.repeat(50)}`);
-  console.log(`Health: http://localhost:${PORT}/api/health`);
+  console.log(`📺 Supports 1000+ websites!`);
   console.log(`${'='.repeat(50)}\n`);
 });
 
