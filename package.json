@@ -11,14 +11,12 @@
     "node": ">=18.0.0"
   },
   "dependencies": {
+    "@distube/ytdl-core": "^4.16.12",
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
     "express": "^4.21.2",
-    "serverless-http": "^3.2.0",
-    "ytdl-core": "^4.11.5",
-    "youtube-dl-exec": "^2.4.15"
+    "serverless-http": "^3.2.0"
   },
-  "devDependencies": {},
   "keywords": [
     "video",
     "downloader",
@@ -29,4 +27,3 @@
   "author": "",
   "license": "ISC"
 }
-
