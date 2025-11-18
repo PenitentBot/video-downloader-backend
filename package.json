@@ -1,18 +1,32 @@
 {
   "name": "video-downloader-backend",
   "version": "1.0.0",
-  "description": "Multi-site Video Downloader Backend",
+  "description": "Video downloader backend with Netlify Functions",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "node server.js"
-  },
-  "dependencies": {
-    "express": "^4.18.2",
-    "cors": "^2.8.5",
-    "dotenv": "^17.2.3"
+    "build": "echo 'No build step required for Netlify Functions'"
   },
   "engines": {
     "node": ">=18.0.0"
-  }
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.3",
+    "express": "^4.21.2",
+    "serverless-http": "^3.2.0",
+    "ytdl-core": "^4.11.5",
+    "youtube-dl-exec": "^2.4.15"
+  },
+  "devDependencies": {},
+  "keywords": [
+    "video",
+    "downloader",
+    "youtube",
+    "netlify",
+    "serverless"
+  ],
+  "author": "",
+  "license": "ISC"
 }
+
